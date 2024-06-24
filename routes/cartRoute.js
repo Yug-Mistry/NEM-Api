@@ -1,17 +1,30 @@
-const {  validateToken } = require('../middlewares/validateTokenHandler')
-const router = require('express').Router()
-const { addItemToCart, getCart, removeItem, deleteCart ,updateCartItemQuantity} = require('../controllers/cartController')
+const { validateToken } = require("../middlewares/validateTokenHandler");
+const router = require("express").Router();
+const {
+     addItemToCart,
+     getCart,
+     removeItem,
+     deleteCart,
+     updateCartItemQuantity,
+} = require("../controllers/cartController");
 
-router.post('/', validateToken, addItemToCart)
+// Route to add an item to the cart
+router.post("/", validateToken, addItemToCart);
 
-router.get('/get-cart', validateToken, getCart)
+// Route to get the cart for the logged-in user
+router.get("/get-cart", validateToken, getCart);
 
-router.post('/remove-cart-item', validateToken, removeItem)
+// Route to remove an item from the cart
+router.post("/remove-cart-item", validateToken, removeItem);
 
-router.post('/update-cart-item-quantity', validateToken, updateCartItemQuantity)
+// Route to update the quantity of an item in the cart
+router.post(
+     "/update-cart-item-quantity",
+     validateToken,
+     updateCartItemQuantity
+);
 
-router.delete('/delete-cart', validateToken, deleteCart)
+// Route to delete the entire cart for the logged-in user
+router.delete("/delete-cart", validateToken, deleteCart);
 
-
-
-module.exports = router
+module.exports = router;

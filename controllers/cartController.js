@@ -3,153 +3,252 @@ const { Cart } = require("../models/cartModel");
 const { Users } = require("../models/userModel");
 const { Products } = require("../models/productModel");
 
+/**
+ * Adds an item to the user's cart.
+ * @param {Request} req - The request object containing productId, title, price, image, and selectedQuentity fields.
+ * @param {Response} res - The response object.
+ * @throws {Error} Throws an error if userId is missing, productId is invalid, or if there are issues with finding or updating the cart.
+ */
 exports.addItemToCart = async (req, res) => {
-  console.log(req.body)
-    const userId = req.user._id
-    // console.log(userId)
-    if (!userId){
-        res.status(400)
-        throw new Error('No such user Found')
-    }
-    // console.log(userId);
-    const userAvailable = await Users?.findById(userId)
-    
+     const userId = req.user._id;
 
-  let {productId,  title, price, image,selectedQuentity} = req.body
-  if (!productId)
-    return res.status(400).send({ status: false, message: "Invalid product" });
-  
-  let productAvailable = await Products?.findOne({_id: req.body.productId});
-  // console.log(productAvailable);
+     if (!userId) {
+          res.status(400);
+          throw new Error("No such user Found");
+     }
 
-  let cart = await Cart.findOne({ userId: userId });
-  if (cart) {
-    let itemIndex = cart.products.findIndex((p) => p.productId == productId);
+     const { productId, title, price, image, selectedQuentity } = req.body;
 
-    if (itemIndex > -1) {
-      let productItem = cart.products[itemIndex];
-      
-      productItem.quantity += parseInt(selectedQuentity);
+     if (!productId || !isValidObjectId(productId)) {
+          return res
+               .status(400)
+               .send({ status: false, message: "Invalid product" });
+     }
 
-      cart.products[itemIndex] = productItem;
-    } else {
+     try {
+          let productAvailable = await Products.findById(productId);
 
-      await cart.products.push({ productId: productId, quantity:parseInt (selectedQuentity), title: title, image: image, price: price });
-    
-    }
-    
-    cart = await cart.save();
+          if (!productAvailable) {
+               return res
+                    .status(404)
+                    .send({ status: false, message: "Product not found" });
+          }
 
-    return res.status(200).send({ status: true, updatedCart: cart });
-  } else {
+          let cart = await Cart.findOne({ userId });
 
-    const newCart = await Cart.create({
-    
-      userId,
-    
-      products: [{ productId: productId, quantity: selectedQuentity, title: title, image: image, price: price }],
-    
-    });
+          if (cart) {
+               let itemIndex = cart.products.findIndex(
+                    (p) => p.productId == productId
+               );
 
-    return res.status(201).send({ status: true, updatedCart: newCart });
-  
-  }
+               if (itemIndex > -1) {
+                    cart.products[itemIndex].quantity +=
+                         parseInt(selectedQuentity);
+               } else {
+                    cart.products.push({
+                         productId,
+                         quantity: parseInt(selectedQuentity),
+                         title,
+                         image,
+                         price,
+                    });
+               }
+
+               cart = await cart.save();
+
+               return res.status(200).send({ status: true, updatedCart: cart });
+          } else {
+               const newCart = await Cart.create({
+                    userId,
+                    products: [
+                         {
+                              productId,
+                              quantity: parseInt(selectedQuentity),
+                              title,
+                              image,
+                              price,
+                         },
+                    ],
+               });
+
+               return res
+                    .status(201)
+                    .send({ status: true, updatedCart: newCart });
+          }
+     } catch (error) {
+          res.status(500).send({
+               status: false,
+               message: "Server error",
+               error,
+          });
+     }
 };
 
-
+/**
+ * Retrieves the user's cart.
+ * @param {Request} req - The request object containing userId.
+ * @param {Response} res - The response object.
+ * @throws {Error} Throws an error if userId is missing or if there are issues with finding the cart.
+ */
 exports.getCart = async (req, res) => {
-    const userId = req.user._id
-    if (!userId){
-        res.status(400)
-        throw new Error('No such user Found')
-    }
-    // console.log(userId);
-    const userAvailable = await Users?.findById(userId)
+     const userId = req.user._id;
 
-  let cart = await Cart.findOne({ userId: userId });
-  if (!cart)
-    return res
-      .status(404)
-      .send({ status: false, message: "Cart not found for this user" });
-  // console.log(cart.products.length);
-  cartCount = cart.products.length
+     if (!userId) {
+          res.status(400);
+          throw new Error("No such user Found");
+     }
 
-  res.status(200).send({ status: true, cart: cart });
+     try {
+          let cart = await Cart.findOne({ userId });
+
+          if (!cart) {
+               return res
+                    .status(404)
+                    .send({
+                         status: false,
+                         message: "Cart not found for this user",
+                    });
+          }
+
+          return res.status(200).send({ status: true, cart });
+     } catch (error) {
+          res.status(500).send({
+               status: false,
+               message: "Server error",
+               error,
+          });
+     }
 };
 
-
+/**
+ * Removes an item from the user's cart.
+ * @param {Request} req - The request object containing productId and userId.
+ * @param {Response} res - The response object.
+ * @throws {Error} Throws an error if userId is missing, or if there are issues with finding or updating the cart.
+ */
 exports.removeItem = async (req, res) => {
-    const userId = req.user._id
-    if (!userId){
-        res.status(400)
-        throw new Error('No such user Found')
-    }
+     const userId = req.user._id;
 
-  let productId = req.body.productId;
-  console.log("remove item" , req.body)
-  let cart = await Cart.findOne({ userId: userId });
-  if (!cart)
-    return res
-      .status(404)
-      .json({ status: false, message: "Cart not found for this user" });
+     if (!userId) {
+          res.status(400);
+          throw new Error("No such user Found");
+     }
 
-  let itemIndex = cart.products.findIndex((p) => p.productId == productId);
-  if (itemIndex > -1) {
-    cart.products.splice(itemIndex, 1);
-    cart = await cart.save();
-    return res.status(200).json({ status: true, updatedCart: cart });
-  }else{
-    return res
-    .status(400)
-    .json({ status: false, message: "Item does not exist in cart" });
-  }
-  
+     const { productId } = req.body;
+
+     try {
+          let cart = await Cart.findOne({ userId });
+
+          if (!cart) {
+               return res
+                    .status(404)
+                    .send({
+                         status: false,
+                         message: "Cart not found for this user",
+                    });
+          }
+
+          let itemIndex = cart.products.findIndex(
+               (p) => p.productId == productId
+          );
+
+          if (itemIndex > -1) {
+               cart.products.splice(itemIndex, 1);
+               cart = await cart.save();
+               return res.status(200).send({ status: true, updatedCart: cart });
+          } else {
+               return res
+                    .status(400)
+                    .send({
+                         status: false,
+                         message: "Item does not exist in cart",
+                    });
+          }
+     } catch (error) {
+          res.status(500).send({
+               status: false,
+               message: "Server error",
+               error,
+          });
+     }
 };
 
-exports.deleteCart =  async(req, res) => {
+/**
+ * Deletes the entire cart of a user.
+ * @param {Request} req - The request object containing userId.
+ * @param {Response} res - The response object.
+ * @throws {Error} Throws an error if userId is missing, or if there are issues with finding or deleting the cart.
+ */
+exports.deleteCart = async (req, res) => {
+     const userId = req.user._id;
 
-  const userId = req.user._id
-    if (!userId){
-        res.status(400)
-        throw new Error('No such user Found')
-    }
-    try {
-      // Find the cart by user ID and delete it
-    const cart = await Cart.findOneAndDelete({ userId });
+     if (!userId) {
+          res.status(400);
+          throw new Error("No such user Found");
+     }
 
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
+     try {
+          const cart = await Cart.findOneAndDelete({ userId });
 
-    return res.status(200).json({ message: 'Cart deleted successfully' });
+          if (!cart) {
+               return res.status(404).send({ message: "Cart not found" });
+          }
 
-    } catch (error) {
-       return res.status(500).json({ message: 'Server error', error });
-    }
+          return res.status(200).send({ message: "Cart deleted successfully" });
+     } catch (error) {
+          res.status(500).send({ message: "Server error", error });
+     }
+};
 
-}
-
+/**
+ * Updates the quantity of an item in the user's cart.
+ * @param {Request} req - The request object containing productId, quantity, and userId.
+ * @param {Response} res - The response object.
+ * @throws {Error} Throws an error if userId is missing, or if there are issues with finding or updating the cart.
+ */
 exports.updateCartItemQuantity = async (req, res) => {
-  const userId = req.user._id;
-  if (!userId) {
-      res.status(400);
-      return res.json({ status: false, message: 'No such user Found' });
-  }
+     const userId = req.user._id;
 
-  const { productId, quantity } = req.body;
-  let cart = await Cart.findOne({ userId: userId });
-  if (!cart) {
-      return res.status(404).json({ status: false, message: "Cart not found for this user" });
-  }
+     if (!userId) {
+          res.status(400);
+          throw new Error("No such user Found");
+     }
 
-  let itemIndex = cart.products.findIndex((p) => p.productId == productId);
-  if (itemIndex > -1) {
-      cart.products[itemIndex].quantity = quantity;
-      cart = await cart.save();
-      
-      return res.status(200).json({ status: true, updatedCart: cart });
+     const { productId, quantity } = req.body;
 
-  } else {
-      return res.status(400).json({ status: false, message: "Item does not exist in cart" });
-  }
+     try {
+          let cart = await Cart.findOne({ userId });
+
+          if (!cart) {
+               return res
+                    .status(404)
+                    .send({
+                         status: false,
+                         message: "Cart not found for this user",
+                    });
+          }
+
+          let itemIndex = cart.products.findIndex(
+               (p) => p.productId == productId
+          );
+
+          if (itemIndex > -1) {
+               cart.products[itemIndex].quantity = quantity;
+               cart = await cart.save();
+               return res.status(200).send({ status: true, updatedCart: cart });
+          } else {
+               return res
+                    .status(400)
+                    .send({
+                         status: false,
+                         message: "Item does not exist in cart",
+                    });
+          }
+     } catch (error) {
+          res.status(500).send({
+               status: false,
+               message: "Server error",
+               error,
+          });
+     }
 };
